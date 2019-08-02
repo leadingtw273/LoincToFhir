@@ -1,36 +1,26 @@
 <template>
   <v-app>
-    <v-app-bar app>
-      <v-toolbar-title class="headline text-uppercase">
-        <span>Vuetify</span>
-        <span class="font-weight-light">MATERIAL DESIGN</span>
-      </v-toolbar-title>
-      <v-spacer></v-spacer>
-      <v-btn
-        text
-        href="https://github.com/vuetifyjs/vuetify/releases/latest"
-        target="_blank"
-      >
-        <span class="mr-2">Latest Release</span>
-      </v-btn>
-    </v-app-bar>
-
     <v-content>
-      <HelloWorld />
+      <v-toolbar dark flat color="primary">
+        <v-toolbar-title>EZ FHIR 資料轉換工具</v-toolbar-title>
+      </v-toolbar>
+
+      <v-container>
+        <router-view></router-view>
+      </v-container>
     </v-content>
   </v-app>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld';
-
 export default {
   name: 'App',
-  components: {
-    HelloWorld,
-  },
-  data: () => ({
-    //
-  }),
 };
 </script>
+
+<style lang="scss">
+#app {
+  font-family: 'Roboto', 'Noto Sans TC', sans-serif;
+  background-color: #424242;
+}
+</style>
