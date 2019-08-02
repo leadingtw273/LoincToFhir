@@ -4,7 +4,6 @@
       <v-toolbar dark flat color="primary">
         <v-toolbar-title>EZ FHIR 資料轉換工具</v-toolbar-title>
       </v-toolbar>
-
       <v-container>
         <router-view></router-view>
       </v-container>
