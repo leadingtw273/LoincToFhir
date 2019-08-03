@@ -65,9 +65,9 @@
                 class="ma-0"
                 v-model="importConfig.fileType"
               >
-                <v-radio label="CSV" value="CSV"></v-radio>
-                <v-radio label="JSON" value="JSON"></v-radio>
-                <v-radio label="XML" value="XML"></v-radio>
+                <v-radio label="CSV" value=".csv"></v-radio>
+                <v-radio label="JSON" value=".json"></v-radio>
+                <v-radio label="XML" value=".xml"></v-radio>
               </v-radio-group>
             </v-flex>
             <v-flex
@@ -109,14 +109,19 @@
                 hide-details
                 class="ma-0 pa-0"
                 v-model="importConfig.file"
-                :accept="acceptFile"
+                :accept="importConfig.fileType"
               ></v-file-input>
             </v-flex>
           </v-layout>
           <v-divider class="my-3"></v-divider>
           <v-layout row justify-center>
             <v-flex shrink pa-0 pr-2>
-              <v-btn color="accent" :disabled="!disableImportBtn">Import</v-btn>
+              <v-btn
+                color="accent"
+                @click.native="importFHIR()"
+                :disabled="!disableImportBtn"
+                >Import</v-btn
+              >
             </v-flex>
             <v-flex shrink pa-0 pl-2>
               <v-btn color="danger" disabled>錯誤資料</v-btn>
@@ -148,16 +153,16 @@
 <script>
 import API from '../services/api.js';
 import ParsedData from '../util/ParsedData.js';
+import FHIRImport from '../services/FHIRImport.js';
 
 function readFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
+    reader.onerror = reject;
     reader.onload = () => {
       resolve(reader.result);
     };
-
-    reader.onerror = reject;
 
     reader.readAsText(file);
   });
@@ -175,7 +180,7 @@ export default {
       importConfig: {
         server: null,
         organization: null,
-        fileType: 'CSV',
+        fileType: '.csv',
         category: 'patient',
         file: null,
       },
@@ -188,17 +193,6 @@ export default {
     },
     targetFile() {
       return this.importConfig.file;
-    },
-    acceptFile() {
-      switch (this.importConfig.fileType) {
-        case 'CSV':
-          return '.csv';
-        case 'JSON':
-          return '.json';
-        case 'XML':
-          return '.xml';
-      }
-      return this.importConfig.fileType;
     },
     disableImportBtn() {
       const props = [];
@@ -227,6 +221,37 @@ export default {
 
       const { fileType, category } = this.importConfig;
       this.importData = ParsedData(data, fileType, category);
+    },
+  },
+  methods: {
+    async importFHIR() {
+      const { server, organization } = this.importConfig;
+      const fhir = new FHIRImport(server, organization);
+
+      for (let index = 0; index < this.importData.length; index++) {
+        const data = this.importData[index];
+
+        const patient_id = await fhir.importPatient(data);
+        const practitioner_id = await fhir.importPractitioner(data);
+        const encounter_id = await fhir.importEncounter(
+          patient_id,
+          practitioner_id,
+          data
+        );
+        const procedureRequest_id = await fhir.importProcedureRequest(
+          patient_id,
+          encounter_id,
+          practitioner_id,
+          data
+        );
+        await fhir.importObservation(
+          patient_id,
+          encounter_id,
+          procedureRequest_id,
+          data
+        );
+      }
+      // console.log(this.importData);
     },
   },
 };
