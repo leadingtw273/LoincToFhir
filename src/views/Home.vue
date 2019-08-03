@@ -24,6 +24,7 @@
                 outlined
                 :items="serverList"
                 v-model="importConfig.server"
+                :disabled="optionDisable"
               ></v-select>
             </v-flex>
             <v-flex
@@ -45,6 +46,7 @@
                 :items="organizationList"
                 v-model="importConfig.organization"
                 no-data-text="Please select the FHIR Server"
+                :disabled="optionDisable"
               ></v-select>
             </v-flex>
             <v-flex
@@ -64,10 +66,11 @@
                 hide-details
                 class="ma-0"
                 v-model="importConfig.fileType"
+                :disabled="optionDisable"
               >
-                <v-radio label="CSV" value="CSV"></v-radio>
-                <v-radio label="JSON" value="JSON"></v-radio>
-                <v-radio label="XML" value="XML"></v-radio>
+                <v-radio label="CSV" value=".csv"></v-radio>
+                <v-radio label="JSON" value=".json"></v-radio>
+                <v-radio label="XML" value=".xml"></v-radio>
               </v-radio-group>
             </v-flex>
             <v-flex
@@ -87,6 +90,7 @@
                 hide-details
                 class="ma-0"
                 v-model="importConfig.category"
+                :disabled="optionDisable"
               >
                 <v-radio label="標準化病人資料" value="patient"></v-radio>
                 <v-radio label="檢驗資料" value="observation"></v-radio>
@@ -109,17 +113,33 @@
                 hide-details
                 class="ma-0 pa-0"
                 v-model="importConfig.file"
-                :accept="acceptFile"
+                :accept="importConfig.fileType"
+                :disabled="optionDisable"
               ></v-file-input>
             </v-flex>
           </v-layout>
           <v-divider class="my-3"></v-divider>
           <v-layout row justify-center>
             <v-flex shrink pa-0 pr-2>
-              <v-btn color="accent" :disabled="!disableImportBtn">Import</v-btn>
+              <v-btn
+                color="accent"
+                @click.native="importCount !== 0 ? reset() : importFHIR()"
+                :min-width="120"
+                :disabled="importBtnDisable"
+              >
+                <v-icon v-if="importCount !== 0">refresh</v-icon>
+                <span v-else>Import</span>
+              </v-btn>
             </v-flex>
             <v-flex shrink pa-0 pl-2>
-              <v-btn color="danger" disabled>錯誤資料</v-btn>
+              <v-btn
+                color="danger"
+                :href="errorHref"
+                download="errorData.json"
+                :min-width="120"
+                :disabled="errorBtnDisable"
+                >錯誤資料</v-btn
+              >
             </v-flex>
           </v-layout>
         </v-container>
@@ -131,13 +151,27 @@
           <v-toolbar-title>Log</v-toolbar-title>
         </v-toolbar>
         <v-container grid-list-xs>
-          <v-progress-linear height="30">
-            <span>Please upload the file</span>
+          <v-progress-linear height="30" v-model="progressValue">
+            <span>{{ progressText }}</span>
           </v-progress-linear>
+          <v-sheet
+            height="318px"
+            class="mt-2 pa-2 overflow-y-auto"
+            v-chat-scroll
+          >
+            <div
+              :class="['mb-1', color]"
+              v-for="{ text, color, id } in logList"
+              :key="id"
+            >
+              <v-divider v-if="text === '---'"></v-divider>
+              <span v-else>{{ text }}</span>
+            </div>
+          </v-sheet>
         </v-container>
       </v-card>
     </v-flex>
-    <v-flex xs12 pa-4>
+    <v-flex xs12 pa-4 v-if="!$vuetify.breakpoint.xsOnly">
       <v-card dark tile color="secondary">
         <v-card-title>I'm a Table</v-card-title>
       </v-card>
@@ -146,18 +180,19 @@
 </template>
 
 <script>
+import uuid from 'uuid';
 import API from '../services/api.js';
 import ParsedData from '../util/ParsedData.js';
+import FHIRImport from '../services/FHIRImport.js';
 
 function readFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
+    reader.onerror = reject;
     reader.onload = () => {
       resolve(reader.result);
     };
-
-    reader.onerror = reject;
 
     reader.readAsText(file);
   });
@@ -175,11 +210,15 @@ export default {
       importConfig: {
         server: null,
         organization: null,
-        fileType: 'CSV',
+        fileType: '.csv',
         category: 'patient',
         file: null,
       },
       importData: [],
+      importCount: 0,
+      errorData: [],
+      loading: false,
+      logList: [],
     };
   },
   computed: {
@@ -189,23 +228,40 @@ export default {
     targetFile() {
       return this.importConfig.file;
     },
-    acceptFile() {
-      switch (this.importConfig.fileType) {
-        case 'CSV':
-          return '.csv';
-        case 'JSON':
-          return '.json';
-        case 'XML':
-          return '.xml';
+    progressText() {
+      const { server, organization, file } = this.importConfig;
+      if (!this.loading) {
+        if (server == null) return 'Please select the Server';
+        if (organization == null) return 'Please select the Organization';
+        if (file == null) return 'Please upload the File';
+        if (this.progressValue === 100) return 'Import finish';
+        return 'Ready to import!';
       }
-      return this.importConfig.fileType;
+
+      return this.progressValue + '%';
     },
-    disableImportBtn() {
+    progressValue() {
+      if (this.importCount === 0) return 0;
+      return Math.ceil((this.importCount / this.importData.length) * 100);
+    },
+    importBtnDisable() {
       const props = [];
       for (let prop in this.importConfig) {
         props.push(this.importConfig[prop]);
       }
-      return props.every(e => e != null);
+      return this.loading || !props.every(e => e != null);
+    },
+    optionDisable() {
+      return this.loading || this.importCount !== 0;
+    },
+    errorBtnDisable() {
+      return this.loading || this.errorData.length == 0;
+    },
+    errorHref() {
+      return (
+        'data:text/json;charset=utf-8,' +
+        encodeURIComponent(JSON.stringify(this.errorData))
+      );
     },
   },
   watch: {
@@ -227,6 +283,103 @@ export default {
 
       const { fileType, category } = this.importConfig;
       this.importData = ParsedData(data, fileType, category);
+    },
+  },
+  methods: {
+    async importFHIR() {
+      this.loading = true;
+      const { server, organization } = this.importConfig;
+      const fhir = new FHIRImport(server, organization);
+
+      for (let index = 0; index < this.importData.length; index++) {
+        this.importCount = index + 1;
+        const data = this.importData[index];
+
+        try {
+          const patient_id = await fhir.importPatient(data);
+          this.logPrint(`[已匯入] Patient ${patient_id}`);
+
+          const practitioner_id = await fhir.importPractitioner(data);
+          this.logPrint(`[已匯入] Practitioner ${practitioner_id}`);
+
+          const encounter_id = await fhir.importEncounter(
+            patient_id,
+            practitioner_id,
+            data
+          );
+          this.logPrint(`[已匯入] Encounter ${encounter_id}`);
+
+          const procedureRequest_id = await fhir.importProcedureRequest(
+            patient_id,
+            encounter_id,
+            practitioner_id,
+            data
+          );
+          this.logPrint(`[已匯入] ProcedureRequest ${procedureRequest_id}`);
+
+          const observation_id = await fhir.importObservation(
+            patient_id,
+            encounter_id,
+            procedureRequest_id,
+            data
+          );
+          this.logPrint(`[已匯入] Observation ${observation_id}`);
+          this.logLine();
+        } catch (err) {
+          if (err.response != null) {
+            this.logPrint(
+              `[匯入失敗] ${err.response.data.issue[0].diagnostics}`,
+              'danger'
+            );
+            this.logLine();
+            this.errorData.push({
+              ErrorMessage: err.response.data.issue[0].diagnostics,
+              Data: data,
+            });
+          }
+        }
+      }
+
+      this.logPrint('All data import finish!', 'primary');
+
+      if (this.errorData.length !== 0) {
+        this.logLine();
+        this.errorData.forEach(({ ErrorMessage, Data }, index) => {
+          this.logPrint(`[${index}]`, 'danger');
+          this.logPrint(`message: ${ErrorMessage}`, 'danger');
+          this.logPrint(`data: ${Data}`, 'danger');
+          this.logLine();
+        });
+        this.logPrint(`Find ${this.errorData.length} errors.`, 'danger');
+      }
+
+      this.loading = false;
+    },
+    logPrint(text, color = '#FFFFFF') {
+      this.logList.push({
+        text,
+        color: this.logColor(color),
+        id: this.getRandomKey(),
+      });
+    },
+    logLine() {
+      this.logList.push({
+        text: '---',
+        color: '#FFFFFF',
+        id: this.getRandomKey(),
+      });
+    },
+    logColor(color) {
+      return color + '--text';
+    },
+    getRandomKey() {
+      return uuid.v4();
+    },
+    reset() {
+      this.importCount = 0;
+      this.importData = [];
+      this.logList = [];
+      this.errorData = [];
     },
   },
 };

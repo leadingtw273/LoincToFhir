@@ -1,21 +1,21 @@
 import { xml2json } from 'xml2json-light';
 
-function processParsedData(data, type, importCategory) {
+function processParsedData(data, type, category) {
   let processData = {};
 
   switch (type) {
-    case 'CSV':
+    case '.csv':
       processData = processCSVData(data);
       break;
-    case 'JSON':
+    case '.json':
       processData = processJSONData(data);
       break;
-    case 'XML':
-      processData = processXMLData(data, importCategory);
+    case '.xml':
+      processData = processXMLData(data, category);
       break;
   }
 
-  switch (importCategory) {
+  switch (category) {
     case 'observation':
       processData = getTargetAttributeList('病歷號', processData)
         .map(patientId => {
@@ -63,10 +63,10 @@ function processJSONData(allText) {
   return data;
 }
 
-function processXMLData(str, importCategory) {
+function processXMLData(str, category) {
   const jsonData = xml2json(str);
   let data;
-  switch (importCategory) {
+  switch (category) {
     case 'observation':
       data = jsonData['骨密']['row'];
       break;
