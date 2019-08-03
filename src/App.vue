@@ -18,6 +18,10 @@ export default {
 </script>
 
 <style lang="scss">
+html {
+  overflow-y: hidden !important;
+}
+
 #app {
   font-family: 'Roboto', 'Noto Sans TC', sans-serif;
   background-color: #424242;
