@@ -151,7 +151,7 @@
           <v-toolbar-title>Log</v-toolbar-title>
         </v-toolbar>
         <v-container grid-list-xs>
-          <v-progress-linear height="30" v-model="progressValue">
+          <v-progress-linear height="30" :value="progressValue">
             <span>{{ progressText }}</span>
           </v-progress-linear>
           <the-log-sheet ref="logSheet" />
