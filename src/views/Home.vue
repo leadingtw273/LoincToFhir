@@ -159,9 +159,7 @@
       </v-card>
     </v-flex>
     <v-flex xs12 pa-4 v-if="!$vuetify.breakpoint.xsOnly">
-      <v-card dark tile color="secondary">
-        <v-card-title>I'm a Table</v-card-title>
-      </v-card>
+      <the-table :category="importConfig.category" :dataList="importData" />
     </v-flex>
   </v-layout>
 </template>
@@ -171,6 +169,7 @@ import API from '../services/api.js';
 import ParsedData from '../util/ParsedData.js';
 import FHIRImport from '../services/FHIRImport.js';
 import TheLogSheet from '../components/TheLogSheet';
+import TheTable from '../components/TheTable';
 
 function readFile(file) {
   return new Promise((resolve, reject) => {
@@ -189,6 +188,7 @@ export default {
   name: 'Home',
   components: {
     TheLogSheet,
+    TheTable,
   },
   data() {
     return {
