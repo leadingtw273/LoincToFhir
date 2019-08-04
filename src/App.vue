@@ -19,7 +19,7 @@ export default {
 
 <style lang="scss">
 html {
-  overflow-y: hidden !important;
+  overflow-y: auto !important;
 }
 
 #app {
