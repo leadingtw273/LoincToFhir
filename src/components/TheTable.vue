@@ -9,10 +9,11 @@
     class="elevation-1 table"
   >
     <template v-slot:top>
-      <v-toolbar color="primary" height="40">
-        <v-toolbar-title>Table</v-toolbar-title>
-
+      <v-toolbar color="primary" height="60">
+        <v-toolbar-title>{{ title != null ? title : 'Table' }}</v-toolbar-title>
         <v-divider class="mx-4" inset vertical></v-divider>
+
+        <slot name="button"></slot>
         <v-text-field
           v-model="search"
           append-icon="search"
@@ -22,17 +23,67 @@
         ></v-text-field>
       </v-toolbar>
     </template>
+
+    <template v-slot:item.index="{ item }">
+      {{
+        dataList.findIndex(data => {
+          return JSON.stringify(data) === JSON.stringify(item);
+        })
+      }}
+    </template>
+
+    <!-- <template v-slot:item.身分證字號="props">
+      <v-edit-dialog :return-value.sync="props.item['身分證字號']">
+        {{ props.item['身分證字號'] }}
+        <template v-slot:input>
+          <v-text-field
+            v-model="props.item['身分證字號']"
+            label="Edit"
+            single-line
+            counter
+          ></v-text-field>
+        </template>
+      </v-edit-dialog>
+    </template> -->
+
+    <template v-slot:item="{ item, headers }">
+      <tr>
+        <td v-for="{ value } in headers" :key="value">
+          <template v-if="value === 'index'">
+            {{
+              dataList.findIndex(data => {
+                return JSON.stringify(data) === JSON.stringify(item);
+              })
+            }}
+          </template>
+          <template v-else>
+            <v-edit-dialog :return-value.sync="item[value]">
+              {{ item[value] }}
+              <template v-slot:input>
+                <v-text-field
+                  v-model="item[value]"
+                  label="Edit"
+                  single-line
+                  counter
+                ></v-text-field>
+              </template>
+            </v-edit-dialog>
+          </template>
+        </td>
+      </tr>
+    </template>
   </v-data-table>
 </template>
 
 <script>
 export default {
   name: 'TheTable',
-  props: ['category', 'dataList'],
+  props: ['category', 'dataList', 'title'],
   data() {
     return {
       search: '',
       patientHeaders: [
+        { text: 'Index', value: 'index' },
         { text: '病歷號', value: '病歷號' },
         { text: '身分證字號', value: '身分證字號' },
         { text: '就醫序號', value: '就醫序號' },
@@ -54,6 +105,7 @@ export default {
         { text: '單位', value: '單位' },
       ],
       observationHeaders: [
+        { text: 'Index', value: 'index' },
         { text: '病歷號', value: '病歷號' },
         { text: '身分證字號', value: '身分證字號' },
         { text: '就醫序號', value: '就醫序號' },

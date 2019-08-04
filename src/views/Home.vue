@@ -122,24 +122,25 @@
           <v-layout row justify-center>
             <v-flex shrink pa-0 pr-2>
               <v-btn
+                v-if="importCount == 0"
                 color="accent"
-                @click.native="importCount !== 0 ? reset() : importFHIR()"
-                :min-width="120"
+                @click.native="importFHIR(importData)"
+                :min-width="200"
                 :disabled="importBtnDisable"
               >
-                <v-icon v-if="importCount !== 0">refresh</v-icon>
-                <span v-else>Import</span>
+                <v-icon left>backup</v-icon>
+                <span>匯入</span>
               </v-btn>
-            </v-flex>
-            <v-flex shrink pa-0 pl-2>
               <v-btn
-                color="danger"
-                :href="errorHref"
-                download="errorData.json"
-                :min-width="120"
-                :disabled="errorBtnDisable"
-                >錯誤資料</v-btn
+                v-else
+                color="accent"
+                @click.native="reset()"
+                :min-width="200"
+                :disabled="importBtnDisable"
               >
+                <v-icon left>settings_backup_restore</v-icon>
+                <span>重置</span>
+              </v-btn>
             </v-flex>
           </v-layout>
         </v-container>
@@ -158,7 +159,38 @@
         </v-container>
       </v-card>
     </v-flex>
-    <v-flex xs12 pa-4 v-if="!$vuetify.breakpoint.xsOnly">
+    <v-flex xs12 pa-4 v-if="errorData.length !== 0">
+      <the-table
+        :category="importConfig.category"
+        :dataList="errorParseData"
+        :title="'ErrorData'"
+      >
+        <template v-slot:button>
+          <v-btn
+            color="danger"
+            :href="errorHref"
+            download="errorData.json"
+            :min-width="150"
+            :disabled="errorBtnDisable"
+          >
+            <v-icon left>get_app</v-icon>
+            下載錯誤資料
+          </v-btn>
+          <v-btn
+            color="accent"
+            @click.native="importFHIR(errorParseData)"
+            class="ml-2"
+            :min-width="150"
+            :disabled="importBtnDisable"
+          >
+            <v-icon left>backup</v-icon>
+            <span>重新匯入</span>
+          </v-btn>
+          <v-spacer></v-spacer>
+        </template>
+      </the-table>
+    </v-flex>
+    <v-flex xs12 pa-4>
       <the-table :category="importConfig.category" :dataList="importData" />
     </v-flex>
   </v-layout>
@@ -206,6 +238,7 @@ export default {
       },
       importData: [],
       importCount: 0,
+      importLength: 0,
       errorData: [],
       loading: false,
     };
@@ -231,7 +264,7 @@ export default {
     },
     progressValue() {
       if (this.importCount === 0) return 0;
-      return Math.ceil((this.importCount / this.importData.length) * 100);
+      return Math.ceil((this.importCount / this.importLength) * 100);
     },
     importBtnDisable() {
       const props = [];
@@ -251,6 +284,9 @@ export default {
         'data:text/json;charset=utf-8,' +
         encodeURIComponent(JSON.stringify(this.errorData))
       );
+    },
+    errorParseData() {
+      return this.errorData.map(({ Data }) => Data);
     },
   },
   watch: {
@@ -275,15 +311,21 @@ export default {
     },
   },
   methods: {
-    async importFHIR() {
-      this.loading = true;
+    async importFHIR(orgDataList) {
+      const dataList = JSON.parse(JSON.stringify(orgDataList));
       const log = this.$refs.logSheet;
+
+      this.loading = true;
+      this.errorData = [];
+      this.importLength = dataList.length;
+
       const { server, organization } = this.importConfig;
       const fhir = new FHIRImport(server, organization);
 
-      for (let index = 0; index < this.importData.length; index++) {
+      log.line();
+      for (let index = 0; index < dataList.length; index++) {
         this.importCount = index + 1;
-        const data = this.importData[index];
+        const data = dataList[index];
 
         try {
           const patient_id = await fhir.importPatient(data);
@@ -335,7 +377,7 @@ export default {
       if (this.errorData.length !== 0) {
         log.line();
         this.errorData.forEach(({ ErrorMessage, Data }, index) => {
-          log.print(`[${index}]`, 'danger');
+          log.print(`[ Index: ${index} ]`, 'danger');
           log.print(`message: ${ErrorMessage}`, 'danger');
           log.print(`data: ${Data}`, 'danger');
           log.line();
@@ -346,6 +388,7 @@ export default {
       this.loading = false;
     },
     reset() {
+      this.importConfig.file = null;
       this.importCount = 0;
       this.importData = [];
       this.errorData = [];
