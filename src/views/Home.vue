@@ -154,20 +154,7 @@
           <v-progress-linear height="30" v-model="progressValue">
             <span>{{ progressText }}</span>
           </v-progress-linear>
-          <v-sheet
-            height="318px"
-            class="mt-2 pa-2 overflow-y-auto"
-            v-chat-scroll
-          >
-            <div
-              :class="['mb-1', color]"
-              v-for="{ text, color, id } in logList"
-              :key="id"
-            >
-              <v-divider v-if="text === '---'"></v-divider>
-              <span v-else>{{ text }}</span>
-            </div>
-          </v-sheet>
+          <the-log-sheet ref="logSheet" />
         </v-container>
       </v-card>
     </v-flex>
@@ -180,10 +167,10 @@
 </template>
 
 <script>
-import uuid from 'uuid';
 import API from '../services/api.js';
 import ParsedData from '../util/ParsedData.js';
 import FHIRImport from '../services/FHIRImport.js';
+import TheLogSheet from '../components/TheLogSheet';
 
 function readFile(file) {
   return new Promise((resolve, reject) => {
@@ -200,6 +187,9 @@ function readFile(file) {
 
 export default {
   name: 'Home',
+  components: {
+    TheLogSheet,
+  },
   data() {
     return {
       serverList: [
@@ -218,7 +208,6 @@ export default {
       importCount: 0,
       errorData: [],
       loading: false,
-      logList: [],
     };
   },
   computed: {
@@ -288,6 +277,7 @@ export default {
   methods: {
     async importFHIR() {
       this.loading = true;
+      const log = this.$refs.logSheet;
       const { server, organization } = this.importConfig;
       const fhir = new FHIRImport(server, organization);
 
@@ -297,17 +287,17 @@ export default {
 
         try {
           const patient_id = await fhir.importPatient(data);
-          this.logPrint(`[已匯入] Patient ${patient_id}`);
+          log.print(`[已匯入] Patient ${patient_id}`);
 
           const practitioner_id = await fhir.importPractitioner(data);
-          this.logPrint(`[已匯入] Practitioner ${practitioner_id}`);
+          log.print(`[已匯入] Practitioner ${practitioner_id}`);
 
           const encounter_id = await fhir.importEncounter(
             patient_id,
             practitioner_id,
             data
           );
-          this.logPrint(`[已匯入] Encounter ${encounter_id}`);
+          log.print(`[已匯入] Encounter ${encounter_id}`);
 
           const procedureRequest_id = await fhir.importProcedureRequest(
             patient_id,
@@ -315,7 +305,7 @@ export default {
             practitioner_id,
             data
           );
-          this.logPrint(`[已匯入] ProcedureRequest ${procedureRequest_id}`);
+          log.print(`[已匯入] ProcedureRequest ${procedureRequest_id}`);
 
           const observation_id = await fhir.importObservation(
             patient_id,
@@ -323,15 +313,15 @@ export default {
             procedureRequest_id,
             data
           );
-          this.logPrint(`[已匯入] Observation ${observation_id}`);
-          this.logLine();
+          log.print(`[已匯入] Observation ${observation_id}`);
+          log.line();
         } catch (err) {
           if (err.response != null) {
-            this.logPrint(
+            log.print(
               `[匯入失敗] ${err.response.data.issue[0].diagnostics}`,
               'danger'
             );
-            this.logLine();
+            log.line();
             this.errorData.push({
               ErrorMessage: err.response.data.issue[0].diagnostics,
               Data: data,
@@ -340,46 +330,26 @@ export default {
         }
       }
 
-      this.logPrint('All data import finish!', 'primary');
+      log.print('All data import finish!', 'primary');
 
       if (this.errorData.length !== 0) {
-        this.logLine();
+        log.line();
         this.errorData.forEach(({ ErrorMessage, Data }, index) => {
-          this.logPrint(`[${index}]`, 'danger');
-          this.logPrint(`message: ${ErrorMessage}`, 'danger');
-          this.logPrint(`data: ${Data}`, 'danger');
-          this.logLine();
+          log.print(`[${index}]`, 'danger');
+          log.print(`message: ${ErrorMessage}`, 'danger');
+          log.print(`data: ${Data}`, 'danger');
+          log.line();
         });
-        this.logPrint(`Find ${this.errorData.length} errors.`, 'danger');
+        log.print(`Find ${this.errorData.length} errors.`, 'danger');
       }
 
       this.loading = false;
     },
-    logPrint(text, color = '#FFFFFF') {
-      this.logList.push({
-        text,
-        color: this.logColor(color),
-        id: this.getRandomKey(),
-      });
-    },
-    logLine() {
-      this.logList.push({
-        text: '---',
-        color: '#FFFFFF',
-        id: this.getRandomKey(),
-      });
-    },
-    logColor(color) {
-      return color + '--text';
-    },
-    getRandomKey() {
-      return uuid.v4();
-    },
     reset() {
       this.importCount = 0;
       this.importData = [];
-      this.logList = [];
       this.errorData = [];
+      this.$refs.logSheet.clear();
     },
   },
 };
