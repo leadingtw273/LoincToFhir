@@ -226,7 +226,7 @@ export default {
     return {
       serverList: [
         'https://hapi.fhir.tw/baseDstu3',
-        'http://hapi.fhir.org/baseR4',
+        'https://hapi.fhir.org/baseR4',
       ],
       organizationList: [],
       importConfig: {
