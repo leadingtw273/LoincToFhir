@@ -294,7 +294,9 @@ export default {
       if (val == null) return;
 
       const api = new API(val);
-      const { data } = await api.getResoure('Organization');
+      const { data } = await api.getResoure('Organization', {
+        name: '高雄榮民總醫院',
+      });
 
       this.organizationList = data.entry.map(({ resource }) => {
         const { id, name } = resource;
